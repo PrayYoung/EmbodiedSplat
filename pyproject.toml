@@ -1,0 +1,22 @@
+[project]
+name = "embodied-splat-sim"
+version = "0.1.0"
+description = "Photorealistic RL environment using 3D Gaussian Splatting (Nerfstudio)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "gymnasium>=1.2.3",
+    "nerfstudio>=0.3.4",
+    "numpy>=1.26,<2",
+    "pyyaml>=6.0.3",
+    "stable-baselines3>=2.7.1",
+    "tensorboard>=2.20.0",
+]
+
+[tool.uv]
+constraint-dependencies = ["pymeshlab>=2025.7"]
+
+[tool.uv.workspace]
+members = [
+    "embodied_splat_sim",
+]
