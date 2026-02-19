@@ -11,6 +11,7 @@ import yaml
 from embodied_splat_sim.types import EnvConfig
 from embodied_splat_sim.sim.state import AgentState
 from embodied_splat_sim.sim.dynamics import step_state_discrete
+from embodied_splat_sim.renderer import NerfstudioRenderer
 
 
 def _load_config(config_path: str | Path) -> EnvConfig:
@@ -133,8 +134,22 @@ class SplatNavEnv(gym.Env):
         # Renderer
         if renderer_mode == "dummy":
             self.renderer = DummyRenderer(self.cfg.width, self.cfg.height)
+        elif renderer_mode == "nerfstudio":
+            from embodied_splat_sim.renderer.nerfstudio_renderer import NerfstudioRenderer
+            from embodied_splat_sim.renderer.ns_config import load_nerfstudio_config, resolve_model_dir
+
+            ns_cfg = load_nerfstudio_config("configs/nerfstudio.yaml")
+            model_dir = resolve_model_dir(ns_cfg)
+
+            self.renderer = NerfstudioRenderer(
+                model_dir=model_dir,
+                width=self.cfg.width,
+                height=self.cfg.height,
+                device=ns_cfg.device,
+                origin_mode=ns_cfg.origin_mode,
+            )
         else:
-            raise ValueError(f"Unknown renderer_mode={renderer_mode}. Use 'dummy' for now.")
+            raise ValueError(f"Unknown renderer_mode={renderer_mode}")
 
         # Cache
         self._prev_dist = self._dist_to_goal(self.state)

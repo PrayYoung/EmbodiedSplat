@@ -1,0 +1,11 @@
+nerfstudio:
+  # Option A: point to a specific trained run dir (contains config.yml + nerfstudio_models/)
+  # model_dir: "scenes/living_room/runs/2026-02-18_123456"
+
+  # Option B: auto-pick the latest run under scenes/<scene>/runs/
+  scene: "living_room"
+  use_latest_run: true
+
+  # Render settings
+  origin_mode: "dataset_cam0"   # "dataset_cam0" or "world"
+  device: null                  # null / "cpu" / "mps" / "cuda"
