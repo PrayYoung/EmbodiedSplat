@@ -36,12 +36,17 @@ def _load_config(config_path: str | Path) -> EnvConfig:
     start_yaw_deg = float(data["task"]["start_yaw_deg"])
     randomize_goal = bool(data["task"].get("randomize_goal", False))
     goal_box_raw = data["task"].get("goal_box", [[goal_xy[0], goal_xy[1]], [goal_xy[0], goal_xy[1]]])
+    randomize_start = bool(data["task"].get("randomize_start", False))
+    start_box_raw = data["task"].get(
+        "start_box",
+        [[start_xy[0], start_xy[1], start_yaw_deg], [start_xy[0], start_xy[1], start_yaw_deg]],
+    )
     goal_box = (
         (float(goal_box_raw[0][0]), float(goal_box_raw[0][1])),
         (float(goal_box_raw[1][0]), float(goal_box_raw[1][1])),
     )
 
-    return EnvConfig(
+    cfg = EnvConfig(
         width=width,
         height=height,
         dt=dt,
@@ -58,6 +63,12 @@ def _load_config(config_path: str | Path) -> EnvConfig:
         randomize_goal=randomize_goal,
         goal_box=goal_box,
     )
+    cfg.randomize_start = randomize_start
+    cfg.start_box = (
+        (float(start_box_raw[0][0]), float(start_box_raw[0][1]), float(start_box_raw[0][2])),
+        (float(start_box_raw[1][0]), float(start_box_raw[1][1]), float(start_box_raw[1][2])),
+    )
+    return cfg
 
 
 class DummyRenderer:
@@ -184,6 +195,13 @@ class SplatNavEnv(gym.Env):
         gy = float(self._rng.uniform(ymin, ymax))
         return gx, gy
 
+    def _sample_start_state(self) -> AgentState:
+        (xmin, ymin, tmin), (xmax, ymax, tmax) = self.cfg.start_box
+        sx = float(self._rng.uniform(xmin, xmax))
+        sy = float(self._rng.uniform(ymin, ymax))
+        yaw = math.radians(float(self._rng.uniform(tmin, tmax)))
+        return AgentState(x=sx, y=sy, z=0.0, yaw=yaw)
+
     def _terminated(self) -> bool:
         return self._dist_to_goal(self.state) <= self.cfg.goal_radius
 
@@ -193,7 +211,10 @@ class SplatNavEnv(gym.Env):
             self._rng = np.random.default_rng(seed)
 
         self._step_count = 0
-        self.state = self._make_start_state()
+        if getattr(self.cfg, "randomize_start", False):
+            self.state = self._sample_start_state()
+        else:
+            self.state = self._make_start_state()
 
         if self.cfg.randomize_goal:
             self.goal_xy = self._sample_goal()
