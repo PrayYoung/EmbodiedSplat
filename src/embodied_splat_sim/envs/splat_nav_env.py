@@ -250,9 +250,12 @@ class SplatNavEnv(gym.Env):
                 cy, cx = h // 2, w // 2
                 r = 2
                 patch = depth[max(0, cy - r) : min(h, cy + r + 1), max(0, cx - r) : min(w, cx + r + 1)]
-                min_depth = float(np.min(patch))
-                if min_depth < self.cfg.collision_min_depth:
-                    collision = True
+                valid = np.isfinite(patch) & (patch > 0)
+                valid_ratio = float(np.mean(valid))
+                if valid_ratio >= 0.5:
+                    p5 = float(np.percentile(patch[valid], 5))
+                    if p5 < self.cfg.collision_min_depth:
+                        collision = True
         if collision:
             candidate = self.state
         self.state = candidate
