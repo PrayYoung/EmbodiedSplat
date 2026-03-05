@@ -202,7 +202,7 @@ class SplatNavEnv(gym.Env):
         self._prev_dist = self._dist_to_goal(self.state)
 
         obs = self.renderer.render(self.state)
-        info = {"dist_to_goal": self._prev_dist}
+        info = {"distance_to_goal": self._prev_dist, "collision": False}
         return obs, info
 
     def step(self, action: int):
@@ -241,7 +241,7 @@ class SplatNavEnv(gym.Env):
         truncated = self._step_count >= self.max_steps
 
         obs = self.renderer.render(self.state)
-        info = {"dist_to_goal": dist, "step_count": self._step_count, "collision": collision}
+        info = {"distance_to_goal": dist, "step_count": self._step_count, "collision": collision}
 
         return obs, reward, terminated, truncated, info
 
