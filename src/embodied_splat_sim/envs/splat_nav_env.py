@@ -22,7 +22,6 @@ def _load_config(config_path: str | Path) -> EnvConfig:
     height = int(data["render"]["height"])
 
     dt = float(data["sim"]["dt"])
-    step_penalty = float(data["sim"]["step_penalty"])
     goal_radius = float(data["sim"]["goal_radius"])
     enable_collision = bool(data["sim"].get("enable_collision", False))
     collision_min_depth = float(data["sim"].get("collision_min_depth", 0.25))
@@ -50,7 +49,6 @@ def _load_config(config_path: str | Path) -> EnvConfig:
         width=width,
         height=height,
         dt=dt,
-        step_penalty=step_penalty,
         goal_radius=goal_radius,
         enable_collision=enable_collision,
         collision_min_depth=collision_min_depth,
@@ -68,6 +66,13 @@ def _load_config(config_path: str | Path) -> EnvConfig:
         (float(start_box_raw[0][0]), float(start_box_raw[0][1]), float(start_box_raw[0][2])),
         (float(start_box_raw[1][0]), float(start_box_raw[1][1]), float(start_box_raw[1][2])),
     )
+    reward_cfg = data.get("reward", {})
+    cfg.step_penalty = float(reward_cfg.get("step_penalty", -0.01))
+    cfg.progress_scale = float(reward_cfg.get("progress_scale", 1.0))
+    cfg.success_bonus = float(reward_cfg.get("success_bonus", 0.0))
+    cfg.collision_penalty = float(reward_cfg.get("collision_penalty", 0.0))
+    cfg.success_radius = float(data["task"].get("success_radius", goal_radius))
+    cfg.max_steps = int(data["task"].get("max_steps", 200))
     return cfg
 
 
@@ -141,7 +146,7 @@ class SplatNavEnv(gym.Env):
         self.cfg = _load_config(config_path)
         assert self.cfg.action_type == "discrete", "MVP only supports discrete actions"
 
-        self.max_steps = int(max_steps)
+        self.max_steps = int(getattr(self.cfg, "max_steps", max_steps))
         self._step_count = 0
         self._rng = np.random.default_rng(seed)
 
@@ -255,10 +260,13 @@ class SplatNavEnv(gym.Env):
         # Reward
         dist = self._dist_to_goal(self.state)
         progress = self._prev_dist - dist
-        reward = float(progress - self.cfg.step_penalty)
+        reward = float(self.cfg.step_penalty + self.cfg.progress_scale * progress)
         self._prev_dist = dist
-
-        terminated = self._terminated()
+        terminated = dist <= self.cfg.success_radius
+        if terminated:
+            reward += float(self.cfg.success_bonus)
+        if collision:
+            reward += float(self.cfg.collision_penalty)
         truncated = self._step_count >= self.max_steps
 
         obs = self.renderer.render(self.state)
