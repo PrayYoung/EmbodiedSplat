@@ -22,3 +22,5 @@ class EnvConfig:
     goal_xy: Tuple[float, float]
     start_xy: Tuple[float, float]
     start_yaw_deg: float
+    randomize_goal: bool
+    goal_box: Tuple[Tuple[float, float], Tuple[float, float]]

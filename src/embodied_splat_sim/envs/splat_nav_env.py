@@ -34,6 +34,12 @@ def _load_config(config_path: str | Path) -> EnvConfig:
     goal_xy = tuple(map(float, data["task"]["goal_xy"]))
     start_xy = tuple(map(float, data["task"]["start_xy"]))
     start_yaw_deg = float(data["task"]["start_yaw_deg"])
+    randomize_goal = bool(data["task"].get("randomize_goal", False))
+    goal_box_raw = data["task"].get("goal_box", [[goal_xy[0], goal_xy[1]], [goal_xy[0], goal_xy[1]]])
+    goal_box = (
+        (float(goal_box_raw[0][0]), float(goal_box_raw[0][1])),
+        (float(goal_box_raw[1][0]), float(goal_box_raw[1][1])),
+    )
 
     return EnvConfig(
         width=width,
@@ -49,6 +55,8 @@ def _load_config(config_path: str | Path) -> EnvConfig:
         goal_xy=(goal_xy[0], goal_xy[1]),
         start_xy=(start_xy[0], start_xy[1]),
         start_yaw_deg=start_yaw_deg,
+        randomize_goal=randomize_goal,
+        goal_box=goal_box,
     )
 
 
@@ -170,6 +178,12 @@ class SplatNavEnv(gym.Env):
         dy = gy - s.y
         return math.sqrt(dx * dx + dy * dy)
 
+    def _sample_goal(self) -> Tuple[float, float]:
+        (xmin, ymin), (xmax, ymax) = self.cfg.goal_box
+        gx = float(self._rng.uniform(xmin, xmax))
+        gy = float(self._rng.uniform(ymin, ymax))
+        return gx, gy
+
     def _terminated(self) -> bool:
         return self._dist_to_goal(self.state) <= self.cfg.goal_radius
 
@@ -181,7 +195,10 @@ class SplatNavEnv(gym.Env):
         self._step_count = 0
         self.state = self._make_start_state()
 
-        # (Optional) randomize goal/start later; keep deterministic now
+        if self.cfg.randomize_goal:
+            self.goal_xy = self._sample_goal()
+        else:
+            self.goal_xy = self.cfg.goal_xy
         self._prev_dist = self._dist_to_goal(self.state)
 
         obs = self.renderer.render(self.state)
