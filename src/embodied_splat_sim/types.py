@@ -12,6 +12,8 @@ class EnvConfig:
     dt: float
     step_penalty: float
     goal_radius: float
+    enable_collision: bool
+    collision_min_depth: float
 
     action_type: str
     forward_step: float

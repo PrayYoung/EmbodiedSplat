@@ -24,6 +24,8 @@ def _load_config(config_path: str | Path) -> EnvConfig:
     dt = float(data["sim"]["dt"])
     step_penalty = float(data["sim"]["step_penalty"])
     goal_radius = float(data["sim"]["goal_radius"])
+    enable_collision = bool(data["sim"].get("enable_collision", False))
+    collision_min_depth = float(data["sim"].get("collision_min_depth", 0.25))
 
     action_type = str(data["action"]["type"])
     forward_step = float(data["action"]["forward_step"])
@@ -39,6 +41,8 @@ def _load_config(config_path: str | Path) -> EnvConfig:
         dt=dt,
         step_penalty=step_penalty,
         goal_radius=goal_radius,
+        enable_collision=enable_collision,
+        collision_min_depth=collision_min_depth,
         action_type=action_type,
         forward_step=forward_step,
         turn_deg=turn_deg,
@@ -189,12 +193,26 @@ class SplatNavEnv(gym.Env):
 
         # Update state
         turn_rad = math.radians(self.cfg.turn_deg)
-        self.state = step_state_discrete(
+        candidate = step_state_discrete(
             self.state,
             int(action),
             forward_step=self.cfg.forward_step,
             turn_rad=turn_rad,
         )
+        collision = False
+        if self.cfg.enable_collision and int(action) in (0, 1, 2, 3):
+            _, depth = self.renderer.render(candidate, return_depth=True)
+            if depth is not None:
+                h, w = depth.shape[:2]
+                cy, cx = h // 2, w // 2
+                r = 2
+                patch = depth[max(0, cy - r) : min(h, cy + r + 1), max(0, cx - r) : min(w, cx + r + 1)]
+                min_depth = float(np.min(patch))
+                if min_depth < self.cfg.collision_min_depth:
+                    collision = True
+        if collision:
+            candidate = self.state
+        self.state = candidate
 
         # Reward
         dist = self._dist_to_goal(self.state)
@@ -206,7 +224,7 @@ class SplatNavEnv(gym.Env):
         truncated = self._step_count >= self.max_steps
 
         obs = self.renderer.render(self.state)
-        info = {"dist_to_goal": dist, "step_count": self._step_count}
+        info = {"dist_to_goal": dist, "step_count": self._step_count, "collision": collision}
 
         return obs, reward, terminated, truncated, info
 
