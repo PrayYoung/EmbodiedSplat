@@ -62,6 +62,20 @@ This verifies the RL environment and training pipeline.
 
 ---
 
+## Demo
+
+Run a quick navigation rollout:
+
+python scripts/demo/run_env_demo.py \
+    --renderer nerfstudio \
+    --steps 200 \
+    --save_video \
+    --video_path demo.mp4
+
+This will generate a short video showing the agent navigating inside the Gaussian Splat scene.
+
+---
+
 ## Creating a Photorealistic Scene
 
 EmbodiedSplat supports:
