@@ -5,6 +5,7 @@ from .nerfstudio_loader import load_nerfstudio_pipeline
 
 
 class SplatRenderer:
+    """Deprecated: use NerfstudioRenderer instead."""
     def __init__(self, model_dir: str):
         self.pipeline = load_nerfstudio_pipeline(model_dir)
         self.device = self.pipeline.device
