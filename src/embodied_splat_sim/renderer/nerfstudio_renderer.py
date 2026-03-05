@@ -125,7 +125,7 @@ class NerfstudioRenderer:
         return cams
 
     @torch.no_grad()
-    def render(self, state: AgentState) -> np.ndarray:
+    def render(self, state: AgentState, return_depth: bool = False):
         """
         Render an RGB image for the given agent state.
 
@@ -137,4 +137,20 @@ class NerfstudioRenderer:
 
         rgb = outputs["rgb"].detach().cpu().numpy()  # (H,W,3), float in [0,1]
         rgb_u8 = (np.clip(rgb, 0.0, 1.0) * 255.0).astype(np.uint8)
-        return rgb_u8
+        if not return_depth:
+            return rgb_u8
+        depth = _extract_depth(outputs)
+        return rgb_u8, depth
+
+
+def _extract_depth(outputs: dict) -> Optional[np.ndarray]:
+    for key in ("depth", "expected_depth", "depths", "rendered_depth"):
+        if key in outputs:
+            depth = outputs[key]
+            if torch.is_tensor(depth):
+                depth = depth.detach().cpu().numpy()
+            # Ensure HxW
+            if depth.ndim == 3 and depth.shape[-1] == 1:
+                depth = depth[:, :, 0]
+            return depth.astype(np.float32)
+    return None

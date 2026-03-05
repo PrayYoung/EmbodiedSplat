@@ -61,38 +61,39 @@ class DummyRenderer:
         self.w = int(width)
         self.h = int(height)
 
-    def render(self, state: AgentState, goal_xy: Tuple[float, float]) -> np.ndarray:
-        gx, gy = goal_xy
-        dx = gx - state.x
-        dy = gy - state.y
-        dist = math.sqrt(dx * dx + dy * dy) + 1e-6
-        bearing = math.atan2(dy, dx)  # world bearing to goal
-        rel = bearing - state.yaw
-        rel = (rel + math.pi) % (2 * math.pi) - math.pi  # [-pi, pi]
+    def render(self, state: AgentState, return_depth: bool = False):
+        """
+        Render a simple RGB image encoding agent yaw and position in a stable way.
 
-        # Base image: distance encoded as brightness
-        # closer -> brighter
-        closeness = 1.0 / (1.0 + dist)  # (0,1]
-        base = int(np.clip(closeness * 255.0, 0, 255))
-
+        Output: uint8 HxWx3
+        """
         img = np.zeros((self.h, self.w, 3), dtype=np.uint8)
-        img[:, :, :] = base
 
-        # Encode relative bearing as a left-right gradient in G channel
-        # rel=-pi -> 0, rel=+pi -> 255
-        gval = int(np.clip((rel + math.pi) / (2 * math.pi) * 255.0, 0, 255))
+        # Encode yaw as a horizontal gradient in G channel.
+        # yaw in [-pi, pi] -> [0, 255]
+        yaw = (state.yaw + math.pi) % (2 * math.pi) - math.pi
+        gval = int(np.clip((yaw + math.pi) / (2 * math.pi) * 255.0, 0, 255))
         img[:, :, 1] = gval
 
-        # Heading dot in R channel
+        # Encode (x, y) as low-frequency patterns for stability.
+        # This makes the observation non-trivial but independent of the goal.
+        xval = int(np.clip((state.x * 10.0 + 128.0), 0, 255))
+        yval = int(np.clip((state.y * 10.0 + 128.0), 0, 255))
+        img[:, :, 2] = xval
+        img[:, :, 0] = yval
+
+        # Draw a heading dot (for debugging/visual sanity).
         cx, cy = self.w // 2, self.h // 2
-        # dot position depends on yaw (just for visualization)
         px = int(cx + (self.w * 0.2) * math.cos(state.yaw))
         py = int(cy - (self.h * 0.2) * math.sin(state.yaw))
         px = int(np.clip(px, 0, self.w - 1))
         py = int(np.clip(py, 0, self.h - 1))
-        img[max(0, py - 3) : min(self.h, py + 4), max(0, px - 3) : min(self.w, px + 4), 0] = 255
+        img[max(0, py - 3) : min(self.h, py + 4), max(0, px - 3) : min(self.w, px + 4), :] = 255
 
-        return img
+        if not return_depth:
+            return img
+        depth = np.full((self.h, self.w), np.inf, dtype=np.float32)
+        return img, depth
 
 
 class SplatNavEnv(gym.Env):
@@ -179,7 +180,7 @@ class SplatNavEnv(gym.Env):
         # (Optional) randomize goal/start later; keep deterministic now
         self._prev_dist = self._dist_to_goal(self.state)
 
-        obs = self.renderer.render(self.state, self.goal_xy)
+        obs = self.renderer.render(self.state)
         info = {"dist_to_goal": self._prev_dist}
         return obs, info
 
@@ -204,11 +205,11 @@ class SplatNavEnv(gym.Env):
         terminated = self._terminated()
         truncated = self._step_count >= self.max_steps
 
-        obs = self.renderer.render(self.state, self.goal_xy)
+        obs = self.renderer.render(self.state)
         info = {"dist_to_goal": dist, "step_count": self._step_count}
 
         return obs, reward, terminated, truncated, info
 
     def render(self):
         # Gymnasium expects render() to return an image in rgb_array mode
-        return self.renderer.render(self.state, self.goal_xy)
+        return self.renderer.render(self.state)
